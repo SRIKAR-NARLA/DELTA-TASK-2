@@ -456,9 +456,9 @@ class Zombie {
                 this.y = this.game.height - this.height;
                 this.vy = 0;
                 if (!this.froze) {
-                    if (this.x < this.game.player.x) {
+                    if (this.x + this.width <= this.game.player.x) {
                         this.x += this.vx;
-                    } else {
+                    } else if(this.x >= this.game.player.x+this.game.player.width){
                         this.x -= this.vx;
                     }
                 }
