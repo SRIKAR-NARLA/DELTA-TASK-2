@@ -38,8 +38,14 @@ class Game{
     }
 
     spawnPowerup(){
-        if(this.gameOver===false){
-            this.powerups=new Powerup(this,'ns','drain',5000);
+        if(this.gameOver===false || this.paused===false){
+            const powerupTypes = [
+                { image: 'ns', effect: 'drain', duration: 5000 },
+                { image: 'ns', effect: 'heal', duration: 7000 },
+                { image: 'ns', effect: 'freeze', duration: 10000 }
+            ];
+            const randomPowerup = powerupTypes[Math.floor(Math.random() * powerupTypes.length)];
+            this.powerups=new Powerup(this, randomPowerup.name, randomPowerup.effect, randomPowerup.duration);
             setTimeout(() => this.spawnPowerup(), 15000);
         }
     }
@@ -69,16 +75,16 @@ class Game{
         if (!this.gameOver) {
             if(this.score>25)
                 this.zombies.push(new Zombie3(this));
-            setTimeout(() => this.spawnZombie3(), 15000);
+            setTimeout(() => this.spawnZombie3(), 25000);
         }
     }
 
-    update(deltaTime) {
+    update() {
         if (this.paused || this.gameOver) {
             return;
         }
         this.player.update();
-        this.zombies.forEach(zombie => zombie.update(deltaTime));
+        this.zombies.forEach(zombie => zombie.update());
         this.powerups && this.powerups.update();
         this.player.shotArray.forEach(shot => shot.update());
         this.utilities && this.utilities.forEach(utility=>{
@@ -294,6 +300,7 @@ class Player{
         this.isBlocked=null;
         this.health = health;
         this.shotArray=[];
+        this.prevShotTime=0;
         this.weapon1 = new Weapon1(this);
         this.weapon2 = new Weapon2(this);
         this.weapon3 = new Weapon3(this);
@@ -332,8 +339,8 @@ class Player{
 
         window.addEventListener('keydown', (e) => {
             if (e.key === 'd') {
-                if(this.x>=400){
-                    this.x=400;
+                if(this.x>=800){
+                    this.x=800;
                     this.vx = 0;
                     this.game.zombies.forEach(zombie=>{
                         zombie.dx=-5;
@@ -453,7 +460,8 @@ class Player{
             const rect = canvas.getBoundingClientRect();
             this.mouseX = e.clientX - rect.left;
             this.mouseY = e.clientY - rect.top;
-            if(this.weapon===this.weapon3){
+            if(!this.paused && !this.gameOver)
+            {if(this.weapon===this.weapon3){
                 this.weapon.shoot(this.x + this.width / 2, this.y, this.mouseX, this.mouseY);
             }else if(this.weapon===this.weapon1){
                 this.weapon.shoot(this.x + this.width / 2, this.y, this.mouseX, this.mouseY);
@@ -466,7 +474,7 @@ class Player{
                 }
             }else if(this.weapon===this.weapon2){
                 this.weapon.shoot(this.x, this.y);
-            }
+            }}
         });
     }
 
@@ -507,9 +515,9 @@ class Player{
     }
 
     update() {
-        if(this.x>400 ){
+        if(this.x>800 ){
             this.vx=0;
-            this.x=400;
+            this.x=800;
         }else if(this.x<200){
             this.vx=0;
             this.x=200;
@@ -543,12 +551,11 @@ class Player{
     
         this.y += this.vy;
 
-        if(this.x + this.vx>400 && this.x!==400)this.x=400;
+        if(this.x + this.vx>800 && this.x!==800)this.x=800;
         else if(this.x+this.vx<200 && this.x!==200)this.x=200
         else this.x += this.vx;
     
-        // Define upper bound for the player's y-axis movement
-        const canvasTop = 0; // Adjust this value if you have an offset
+        const canvasTop = 0; 
     
         if (this.y + this.height >= this.game.height) {
             this.y = this.game.height - this.height;
@@ -568,13 +575,13 @@ class Player{
 }    
 
 class Zombie {
-    constructor(game, width, height, vx, vy, health, sprite, frameWidth, frameHeight) {
+    constructor(game, width, height, vx, vy, health) {
         this.game = game;
         this.justHit = false;
         this.froze = false;
         this.isBlocked = false;
-        this.width = 50;
-        this.height = 50;
+        this.width = width;
+        this.height = height;
         this.x = Math.random() < 0.5 ? 0 : this.game.width - this.width;
         this.y = this.game.height - this.height;
         this.vx = vx;
@@ -585,19 +592,7 @@ class Zombie {
         this.direction = 'right';
         this.dx = 0;
         this.dy = 0;
-        this.sprite = sprite;
-        this.frameWidth = frameWidth;
-        this.frameHeight = frameHeight;
 
-        this.animations = {
-            walk: { frames: [0, 1, 2, 3, 4, 5, 6], frameWidth: this.frameWidth, frameHeight: this.frameHeight }
-            // Add other animations here if needed
-        };
-
-        this.currentAnimation = 'walk'; // Initial animation
-        this.currentFrame = 0;
-        this.frameTimer = 0;
-        this.frameInterval = 100; // Change frame every 100ms
     }
 
     draw(c) {
@@ -605,15 +600,16 @@ class Zombie {
 
             if (this.direction === 'right') {
                 // Draw the sprite facing right
-                c.fillRect(this.x,this.y,this.width,this.height)
+                c.fillRect(this.x,this.y,this.width,this.height);
             } else {
                 // Draw the sprite facing left (flip horizontally)
+                c.fillRect(this.x,this.y,this.width,this.height);
                 
             }
         }
     }
 
-    update(deltaTime) {
+    update() {
         this.x += this.dx;
         this.y += this.dy;
         if (this.isBlocked) {
@@ -657,8 +653,9 @@ class Zombie {
 
 class Zombie1 extends Zombie {
     constructor(game) {
-
-        super(game, 20, 20, 1, 0, 20);
+        const image = new Image();
+        image.src='./zombie1/zombie-1-run.jpg'
+        super(game, 20, 20, 1, 0, 20,image,1,1);
     }
 
     getColor() {
@@ -707,15 +704,13 @@ class Projectile extends Attack {
         this.vx = 0;
         this.vy = 0;
         this.ax = 0;
-        this.ay = 0.1; // You can adjust this if you want gravity effect
+        this.ay = 0.1; 
         this.type = 'type1';
         this.dx=0;
         this.dy=0;
 
-        // Calculate the angle to the target
         const angle = Math.atan2(targetY - y, targetX - x);
 
-        // Set velocity components based on the angle
         this.vx = this.speed * Math.cos(angle);
         this.vy = this.speed * Math.sin(angle);
     }
@@ -727,7 +722,6 @@ class Projectile extends Attack {
         this.y += this.vy;
         this.vy += this.ay;
 
-        // Remove the projectile if it goes off screen
         if (this.x < 0 || this.x > this.game.width || this.y < 0 || this.y > this.game.height) {
             this.game.player.shotArray = this.game.player.shotArray.filter(p => p !== this);
             return;
@@ -802,10 +796,10 @@ class Weapon1 extends Weapons{
     }
 
     shoot(x, y, x2,y2) {
-        //  if (Date.now() - this.player.prevShotTime > 1000){
+        if (Date.now() - this.player.prevShotTime > 1000){
         this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed,x2,y2,this.damage,10));
         this.player.prevShotTime= Date.now();
-        //}
+        }
     }
 }
 
@@ -820,12 +814,14 @@ class Weapon2 extends Weapons{
     }
 
     shoot(x,y){
+        if (Date.now() - this.player.prevShotTime > 1500){
         this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,10,10,this.damage,5));
         this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,30,30,this.damage,5));
         this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,60,60,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,90,90,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,120,120,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,160,160,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,300,300,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,330,330,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,430,430,this.damage,5));
+        }
     }
 }
 
@@ -838,7 +834,9 @@ class Weapon3 extends Weapons{
     }
 
     shoot(x1,y1,x2,y2){
+        if (Date.now() - this.player.prevShotTime > 5000){
         this.player.shotArray.push(new Shot(this.player.game,x1+this.player.width/2,y1,x2,y2,this.speed,this.damage,20));
+        }
 
     }
 }
