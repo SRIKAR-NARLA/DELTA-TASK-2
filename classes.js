@@ -3,9 +3,9 @@ class Game{
         this.ctx = ctx;
         this.width = width;
         this.height = height;
-        this.player = new Player(this,10,10,0,1,0,1,40,40,100);
+        this.player = new Player(this,200,200,0,1,0,1,40,40,100);
         this.score=0;
-        this.cash=20000;
+        this.cash=200;
         this.zombies = [];
         this.utilities = [];
         this.powerups=null;
@@ -13,6 +13,28 @@ class Game{
         this.gameOver=false;
         this.startSpawning();
         this.spawnPowerup();
+    }
+
+    reset() {
+        this.player = new Player(this, 200, 200, 0, 1, 0, 0.1, 40, 40, 100);
+        this.score = 0;
+        this.cash = 200;
+        this.zombies = [];
+        this.powerups = null;
+        this.utilities = [];
+        this.paused = false;
+        this.gameOver = false;
+        this.leaderBoard = this.loadLeaderBoard();
+        this.startSpawning();
+        this.spawnPowerup();
+    }
+
+    restartGame() {
+        if (this.gameOver) {
+            this.reset();
+            this.paused = false;
+            this.gameOver = false;
+        }
     }
 
     spawnPowerup(){
@@ -51,10 +73,12 @@ class Game{
         }
     }
 
-    update() {
-        if (this.paused || this.gameOver) return;
+    update(deltaTime) {
+        if (this.paused || this.gameOver) {
+            return;
+        }
         this.player.update();
-        this.zombies.forEach(zombie => zombie.update());
+        this.zombies.forEach(zombie => zombie.update(deltaTime));
         this.powerups && this.powerups.update();
         this.player.shotArray.forEach(shot => shot.update());
         this.utilities && this.utilities.forEach(utility=>{
@@ -63,6 +87,14 @@ class Game{
                 utility.shoot();
         })
         this.checkCollisions();
+        this.player.isBlocked=null;
+
+        if(this.player.health<=0)this.player.health=0;
+                    if(this.player.health===0){
+                        this.gameOver=true;
+                        this.saveScore(this.score);
+                        this.leaderBoard = this.loadLeaderBoard();
+        }
     }
 
     draw() {
@@ -76,13 +108,13 @@ class Game{
         this.ctx.fillText(`Score: ${this.score}`, this.width - 150, 20);
         this.ctx.fillText(`Cash: ${this.cash}`, this.width - 150, 50);
         
-        // if (this.paused) {
-        //     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        //     this.ctx.fillRect(0, 0, this.width, this.height);
-        //     this.ctx.fillStyle = 'white';
-        //     this.ctx.font = '40px Arial';
-        //     this.ctx.fillText('Paused', this.width / 2 - 60, this.height / 2);
-        //}
+        if (this.paused) {
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = '40px Arial';
+            this.ctx.fillText('Paused', this.width / 2 - 60, this.height / 2);
+        }
         
         if (this.gameOver) {
            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
@@ -92,7 +124,32 @@ class Game{
            this.ctx.fillText('Game Over', this.width / 2 - 100, this.height / 2);
            this.ctx.font = '20px Arial';
            this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2 - 60, this.height / 2 + 40);
+           this.displayLeaderBoard();
         }
+    }
+
+    saveScore(score) {
+        let leaderBoard = this.loadLeaderBoard();
+        leaderBoard.push(score);
+        leaderBoard.sort((a, b) => b - a); 
+        if (leaderBoard.length > 3) {
+            leaderBoard.pop(); 
+        }
+        localStorage.setItem('leaderBoard', JSON.stringify(leaderBoard));
+    }
+
+    loadLeaderBoard() {
+        let leaderBoard = localStorage.getItem('leaderBoard');
+        return leaderBoard ? JSON.parse(leaderBoard) : [];
+    }
+
+    displayLeaderBoard() {
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '20px Arial';
+        this.ctx.fillText('Leaderboard:', this.width / 2 - 60, this.height / 2 + 80);
+        this.leaderBoard.forEach((score, index) => {
+            this.ctx.fillText(`${index + 1}. ${score}`, this.width / 2 - 60, this.height / 2 + 100 + index * 20);
+        });
     }
 
     clamp(value, min, max) {
@@ -112,8 +169,8 @@ class Game{
 
     isCollidingRR(rect1, rect2) {
         return (
-            rect1.x < rect2.x + rect2.width &&
-            rect1.x + rect1.width > rect2.x &&
+            rect1.x <= rect2.x + rect2.width &&
+            rect1.x + rect1.width >= rect2.x &&
             rect1.y < rect2.y + rect2.height &&
             rect1.y + rect1.height > rect2.y
         );
@@ -137,8 +194,14 @@ class Game{
                 if(zombie.justHit===false){
                     zombie.justHit=true;
                     this.player.health-=25;
-                    if(this.player.health<=0)this.player.health=0;
-                    if(this.player.health===0)this.gameOver=true;
+                    if(zombie instanceof Zombie3){
+                        for(let i=0;i<5;i++){
+                            setTimeout(()=>{
+                                this.player.health-=5;
+                                if(this.player.health<=0)this.player.health=0;
+                            },5000);
+                        }
+                    }
                     setTimeout(()=>{
                         zombie.justHit=false;
                     },2500);
@@ -158,7 +221,7 @@ class Game{
             if(utility.name==='block'){
                 if (this.isCollidingRR(this.player, utility)) {
                     // Top collision
-                    if (this.player.y + this.player.height <= utility.y + this.player.vy) {
+                    if (this.player.y + this.player.height < utility.y + this.player.vy) {
                         this.player.y = utility.y - this.player.height;
                         this.player.vy = 0;
                         this.player.ay = 0;
@@ -170,16 +233,6 @@ class Game{
                     else if (this.player.y >= utility.y + utility.height - this.player.vy) {
                         this.player.y = utility.y + utility.height;
                         this.player.vy = 0;
-                    }
-                    // Right collision
-                    else if (this.player.x + this.player.width <= utility.x + this.player.vx) {
-                        this.player.x = utility.x - this.player.width;
-                        this.player.vx = 0;
-                    }
-                    // Left collision
-                    else if (this.player.x >= utility.x + utility.width - this.player.vx) {
-                        this.player.x = utility.x + utility.width;
-                        this.player.vx = 0;
                     }
                 }
                 else if(this.player.onBlock && (this.player.x > utility.x + this.player.width || this.player.x < utility.x - this.player.width)){
@@ -204,9 +257,11 @@ class Game{
                         this.utilities = this.utilities.filter(p => p !== utility);
                         zombie.vx/=2;
                     }else if(utility.name==='block'){
-                        zombie.isBlocked=true;
-                        utility.health-=25;
-                        if(utility.health===0)this.utilities = this.utilities.filter(p => p !== utility);
+                        if(zombie.y+zombie.height===utility.y+utility.height){
+                            zombie.isBlocked=true;
+                            utility.health-=50;
+                            if(utility.health===0)this.utilities = this.utilities.filter(p => p !== utility);   
+                        }
                     }else if(utility.name==='tower'){
                         zombie.isBlocked=true;
                         utility.health-=25;
@@ -236,6 +291,7 @@ class Player{
         this.isJumping = false;
         this.isFlying = false;
         this.onBlock=false;
+        this.isBlocked=null;
         this.health = health;
         this.shotArray=[];
         this.weapon1 = new Weapon1(this);
@@ -243,16 +299,32 @@ class Player{
         this.weapon3 = new Weapon3(this);
         this.weapon=this.weapon1;
         this.facingDirection = 'right';
+        this.wfacingDirection = 'right';
         this.maxFuel = 200; 
         this.currentFuel = this.maxFuel; 
         this.fuelConsumptionRate = 1; 
-        this.fuelRegenerationRate = 0.25; 
+        this.fuelRegenerationRate = 0.25;
+        this.fireParticles=[]; 
         this.control();
+        this.mouseX = null;
+        this.mouseY = null;
     }
 
     control(){
         window.addEventListener('keyup', (e) => {
-            if (e.key === 'd' || e.key === 'a') this.vx = 0;
+            if (e.key === 'd' || e.key === 'a'){
+                this.vx=0;
+                this.game.zombies.forEach(zombie=>{
+                    zombie.dx=0;
+                })
+                this.game.utilities.forEach(utility=>{
+                    utility.dx=0;
+                })
+                this.shotArray.forEach(shot=>{
+                    shot.dx=0;
+                })
+                if(this.game.powerups)this.game.powerups.dx=0;
+            }
             if(e.key==='w'){
                 this.vy=0;
             }
@@ -260,14 +332,45 @@ class Player{
 
         window.addEventListener('keydown', (e) => {
             if (e.key === 'd') {
-                this.vx = factor/2;
+                if(this.x>=400){
+                    this.x=400;
+                    this.vx = 0;
+                    this.game.zombies.forEach(zombie=>{
+                        zombie.dx=-5;
+                    })
+                    this.game.utilities.forEach(utility=>{
+                        utility.dx=-5;
+                    })
+                    this.shotArray.forEach(shot=>{
+                        shot.dx=-5;
+                    })
+                    if(this.game.powerups)this.game.powerups.dx=-5;
+                }
+                else this.vx = 5;
                 this.facingDirection = 'right';
+                this.wfacingDirection = 'right';
             }
             else if (e.key === 'a') {
-                this.vx = -factor/2;
+                if(this.x<=200){
+                    this.x=200;
+                    this.vx = 0;
+                    this.game.zombies.forEach(zombie=>{
+                        zombie.dx=5;
+                    })
+                    this.game.utilities.forEach(utility=>{
+                        utility.dx=5;
+                    })
+                    this.shotArray.forEach(shot=>{
+                        shot.dx=5;
+                    })
+                    if(this.game.powerups)this.game.powerups.dx=5;
+                }
+                else this.vx = -5;
                 this.facingDirection = 'left';
+                this.wfacingDirection = 'left';
             }
             else if (e.key === ' ' && !this.isJumping) {
+                this.isBlocked=null;
                 this.vy = -factor;
                 this.ay=factor/10;
                 this.ax=this.ay;
@@ -277,11 +380,13 @@ class Player{
             }
             else if(e.key==='w'){
                 if (this.currentFuel > 0) {
+                    this.isBlocked=null;
                     this.isJumping = true;
                     this.isFlying = true;
                     this.vy = -factor;
                     this.ay = 0;
                     this.facingDirection = 'up';
+                    this.fireParticles=[];
                 }
             }
             else if(e.key==='s'){
@@ -289,20 +394,10 @@ class Player{
                 this.vy = factor;
                 this.ay=factor/10;
                 this.facingDirection = 'down';
+                this.fireParticles=[];
             } 
             else if(e.key==='p'){
-                if(this.weapon===this.weapon1){
-                    this.weapon.shoot(this.x, this.y,this.facingDirection);
-                    if(this.facingDirection==='right'){
-                        this.x-=1;
-                        this.y-=1;
-                    }else if(this.facingDirection==='left'){
-                        this.x+=1;
-                        this.y-=1;
-                    }
-                }else if(this.weapon===this.weapon2){
-                    this.weapon.shoot(this.x, this.y);
-                }
+                this.game.restartGame();
             }else if(e.key==='1'){
                 this.weapon=this.weapon1;
             }else if(e.key==='2'){
@@ -351,20 +446,42 @@ class Player{
                     this.game.utilities.push(new RightTower(this.game,this.x,this.y))
                     this.game.cash-=200;
                 }
-            }
+            }else if(e.key==='f')this.game.paused=!this.game.paused;
         });
 
         window.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            this.mouseX = e.clientX - rect.left;
+            this.mouseY = e.clientY - rect.top;
             if(this.weapon===this.weapon3){
-                const rect = canvas.getBoundingClientRect();
-                const x2 = e.clientX - rect.left;
-                const y2 = e.clientY - rect.top;
-                this.weapon.shoot(this.x + this.width / 2, this.y, x2, y2);
+                this.weapon.shoot(this.x + this.width / 2, this.y, this.mouseX, this.mouseY);
+            }else if(this.weapon===this.weapon1){
+                this.weapon.shoot(this.x + this.width / 2, this.y, this.mouseX, this.mouseY);
+                if(this.facingDirection==='right'){
+                    this.x-=1;
+                    this.y-=1;
+                }else if(this.facingDirection==='left'){
+                    this.x+=1;
+                    this.y-=1;
+                }
+            }else if(this.weapon===this.weapon2){
+                this.weapon.shoot(this.x, this.y);
             }
         });
     }
 
     draw(c) {
+        // if (this.mouseX !== null && this.mouseY !== null) {
+        //     c.beginPath();
+        //     c.moveTo(this.x + this.width / 2, this.y);
+        //     c.lineTo(this.mouseX, this.mouseY);
+        //     c.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+        //     c.lineWidth = 2;
+        //     c.stroke();
+        //     c.closePath();
+        // }
+
+        this.fireParticles.forEach(particle => particle.draw(ctx));
         c.fillStyle = 'blue';
         c.fillRect(this.x, this.y, this.width, this.height);
 
@@ -383,11 +500,25 @@ class Player{
         c.strokeRect(10, 10, 100, 10);
     }
 
+    createFireParticles() {
+        for (let i = 0; i < 20; i++) {
+            this.fireParticles.push(new FireParticle(this.game, this.x + this.width / 2, this.y + this.height));
+        }
+    }
+
     update() {
+        if(this.x>400 ){
+            this.vx=0;
+            this.x=400;
+        }else if(this.x<200){
+            this.vx=0;
+            this.x=200;
+        }
 
         if (this.isFlying) {
             if (this.currentFuel > 0) {
                 this.currentFuel -= this.fuelConsumptionRate;
+                this.createFireParticles();
                 if (this.currentFuel < 0) {
                     this.currentFuel = 0;
                 }
@@ -395,7 +526,8 @@ class Player{
                 this.isFlying = false;
                 this.vy = 0;
                 this.ay = factor / 10;
-                this.facingDirection='down';
+                this.facingDirection = 'down';
+                this.fireParticles = [];
             }
         } else {
             if (this.currentFuel < this.maxFuel) {
@@ -405,29 +537,44 @@ class Player{
                 }
             }
         }
-
-        this.x += this.vx;
+    
+        this.fireParticles.forEach(particle => particle.update());
+        this.fireParticles = this.fireParticles.filter(particle => particle.isAlive());
+    
         this.y += this.vy;
+
+        if(this.x + this.vx>400 && this.x!==400)this.x=400;
+        else if(this.x+this.vx<200 && this.x!==200)this.x=200
+        else this.x += this.vx;
+    
+        // Define upper bound for the player's y-axis movement
+        const canvasTop = 0; // Adjust this value if you have an offset
     
         if (this.y + this.height >= this.game.height) {
             this.y = this.game.height - this.height;
             this.vy = 0;
             this.isJumping = false;
+        } else if (this.y < canvasTop) {
+            this.y = canvasTop;
+            this.vy = 0;
+            this.isJumping = false;
         } else {
             this.vy += this.ay;
-            if(this.isJumping && !this.isFlying && this.vy>=0)this.facingDirection='down';
+            if (this.isJumping && !this.isFlying && this.vy >= 0) {
+                this.facingDirection = 'down';
+            }
         }
     }
-}
+}    
 
 class Zombie {
-    constructor(game, width, height, vx, vy, health) {
+    constructor(game, width, height, vx, vy, health, sprite, frameWidth, frameHeight) {
         this.game = game;
         this.justHit = false;
         this.froze = false;
-        this.isBlocked=false;
-        this.width = width;
-        this.height = height;
+        this.isBlocked = false;
+        this.width = 50;
+        this.height = 50;
         this.x = Math.random() < 0.5 ? 0 : this.game.width - this.width;
         this.y = this.game.height - this.height;
         this.vx = vx;
@@ -435,18 +582,44 @@ class Zombie {
         this.ax = 0;
         this.ay = 0;
         this.health = health;
+        this.direction = 'right';
+        this.dx = 0;
+        this.dy = 0;
+        this.sprite = sprite;
+        this.frameWidth = frameWidth;
+        this.frameHeight = frameHeight;
+
+        this.animations = {
+            walk: { frames: [0, 1, 2, 3, 4, 5, 6], frameWidth: this.frameWidth, frameHeight: this.frameHeight }
+            // Add other animations here if needed
+        };
+
+        this.currentAnimation = 'walk'; // Initial animation
+        this.currentFrame = 0;
+        this.frameTimer = 0;
+        this.frameInterval = 100; // Change frame every 100ms
     }
 
     draw(c) {
         if (this.health > 0) {
-            c.fillStyle = this.getColor();
-            c.fillRect(this.x, this.y, this.width, this.height);
+
+            if (this.direction === 'right') {
+                // Draw the sprite facing right
+                c.fillRect(this.x,this.y,this.width,this.height)
+            } else {
+                // Draw the sprite facing left (flip horizontally)
+                
+            }
         }
     }
 
-    update() {
-        if(this.isBlocked){
-            this.health=0;
+    update(deltaTime) {
+        this.x += this.dx;
+        this.y += this.dy;
+        if (this.isBlocked) {
+            if (this.direction === 'right') this.x -= 100;
+            else this.x += 100;
+            this.isBlocked = !this.isBlocked;
         }
 
         if (this.health > 0) {
@@ -457,20 +630,23 @@ class Zombie {
                 this.vy = 0;
                 if (!this.froze) {
                     if (this.x + this.width <= this.game.player.x) {
+                        this.direction = 'right';
                         this.x += this.vx;
-                    } else if(this.x >= this.game.player.x+this.game.player.width){
+                    } else if (this.x >= this.game.player.x + this.game.player.width) {
                         this.x -= this.vx;
+                        this.direction = 'left';
                     }
                 }
                 this.isJumping = false;
             } else {
                 this.vy += this.ay;
-                if(this.vy>0)this.facingDirection='down';
+                if (this.vy > 0) this.facingDirection = 'down';
             }
+
         } else {
             this.game.zombies = this.game.zombies.filter(z => z !== this);
-            this.game.score+=1;
-            this.game.cash+=20;
+            this.game.score += 1;
+            this.game.cash += 20;
         }
     }
 
@@ -481,6 +657,7 @@ class Zombie {
 
 class Zombie1 extends Zombie {
     constructor(game) {
+
         super(game, 20, 20, 1, 0, 20);
     }
 
@@ -488,6 +665,7 @@ class Zombie1 extends Zombie {
         return 'green';
     }
 }
+
 
 class Zombie2 extends Zombie {
     constructor(game) {
@@ -507,49 +685,6 @@ class Zombie3 extends Zombie{
     getColor() {
         return 'blue';
     }
-
-    // update() {
-    //     if (this.health !== 0) {
-    //         this.y += this.vy;
-
-    //         // Simple climbing logic (example)
-    //         // Assume obstacles are rectangles in an array `this.game.obstacles`
-    //         let onGround = false;
-    //         this.game.obstacles.forEach(obstacle => {
-    //             if (
-    //                 this.x < obstacle.x + obstacle.width &&
-    //                 this.x + this.width > obstacle.x &&
-    //                 this.y + this.height >= obstacle.y &&
-    //                 this.y < obstacle.y + obstacle.height
-    //             ) {
-    //                 this.y = obstacle.y - this.height;
-    //                 onGround = true;
-    //                 this.vy = 0;
-    //             }
-    //         });
-
-    //         if (!onGround) {
-    //             if (this.y + this.height >= this.game.height) {
-    //                 this.y = this.game.height - this.height;
-    //                 this.vy = 0;
-    //             } else {
-    //                 this.vy += this.ay;
-    //             }
-    //         }
-
-    //         if (!this.froze) {
-    //             if (this.x < this.game.player.x) {
-    //                 this.x += this.vx;
-    //             } else {
-    //                 this.x -= this.vx;
-    //             }
-    //         }
-
-    //         this.isJumping = false;
-    //     } else {
-    //         this.game.zombies = this.game.zombies.filter(z => z !== this);
-    //     }
-    // }
 }
 
 
@@ -560,49 +695,54 @@ class Attack{
         this.y = y;
         this.speed = speed;
         this.radius = radius;
+        this.dx=0;
+        this.dy=0;
     }
 }
 
-class Projectile extends Attack{
-    constructor(game,x,y,speed,direction,damage,radius){
+class Projectile extends Attack {
+    constructor(game, x, y, speed, targetX, targetY, damage, radius) {
         super(game,x,y,speed,radius);
-        this.direction = direction; 
         this.damage = damage;
-        this.vx=0;
-        this.vy=0;
-        this.ax=0;
-        this.ay=factor/100;
-        this.type='type1';
+        this.vx = 0;
+        this.vy = 0;
+        this.ax = 0;
+        this.ay = 0.1; // You can adjust this if you want gravity effect
+        this.type = 'type1';
+        this.dx=0;
+        this.dy=0;
 
-        if(this.direction==='right'){
-            this.vx = this.speed * Math.cos(Math.PI / 4); 
-            this.vy = -this.speed * Math.sin(Math.PI / 4);
-        }
-        else if(this.direction==='left'){
-            this.vx = -this.speed * Math.cos(Math.PI / 4); 
-            this.vy = -this.speed * Math.sin(Math.PI / 4);
-        }
+        // Calculate the angle to the target
+        const angle = Math.atan2(targetY - y, targetX - x);
+
+        // Set velocity components based on the angle
+        this.vx = this.speed * Math.cos(angle);
+        this.vy = this.speed * Math.sin(angle);
     }
 
     update() {
+        this.x += this.dx;
+        this.y += this.dy;
         this.x += this.vx;
+        this.y += this.vy;
         this.vy += this.ay;
 
+        // Remove the projectile if it goes off screen
         if (this.x < 0 || this.x > this.game.width || this.y < 0 || this.y > this.game.height) {
             this.game.player.shotArray = this.game.player.shotArray.filter(p => p !== this);
             return;
         }
-        this.y += this.vy;
     }
 
     draw(ctx) {
         ctx.fillStyle = 'red';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2,true);
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, true);
         ctx.fill();
         ctx.closePath();
     }
 }
+
 
 class Shot extends Attack{
     constructor(game, x1, y1, x2, y2, speed, damage,radius) {
@@ -618,9 +758,13 @@ class Shot extends Attack{
 
         this.ax = 0; 
         this.ay = 0; 
+        this.dx=0;
+        this.dy=0;
     }
 
     update() {
+        this.x += this.dx;
+        this.y += this.dy;
         this.vx += this.ax;
         this.vy += this.ay;
 
@@ -657,10 +801,10 @@ class Weapon1 extends Weapons{
         this.speed = 5;
     }
 
-    shoot(x, y, direction) {
-        //if (Date.now() - this.player.prevShotTime > 0){
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed,direction,this.damage,10));
-        //this.player.prevShotTime= Date.now();
+    shoot(x, y, x2,y2) {
+        //  if (Date.now() - this.player.prevShotTime > 1000){
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed,x2,y2,this.damage,10));
+        this.player.prevShotTime= Date.now();
         //}
     }
 }
@@ -676,12 +820,12 @@ class Weapon2 extends Weapons{
     }
 
     shoot(x,y){
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,'right',this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,'right',this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,'right',this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,'left',this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,'left',this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,'left',this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,10,10,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,30,30,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,60,60,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,90,90,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,120,120,this.damage,5));
+        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,160,160,this.damage,5));
     }
 }
 
@@ -712,6 +856,8 @@ class Powerup{
         this.type=type;
         this.spawnTime = Date.now();
         this.lifespan=lifespan;
+        this.dx=0;
+        this.dy=0;
     }
 
     draw(ctx){
@@ -744,6 +890,8 @@ class Powerup{
     }
 
     update() {
+        this.x+=this.dx;
+        this.y+=this.dy;
         if (Date.now() - this.spawnTime >= this.lifespan) {
             this.active = false; 
         }
@@ -761,9 +909,13 @@ class Utility {
         this.name=name;
         this.vx=0;
         this.vy=1;
+        this.dx=0;
+        this.dy=0;
     }
 
     update(){
+        this.x+=this.dx;
+        this.y+=this.dy;
         let nextX = this.x + this.vx;
         let nextY = this.y + this.vy;
 
@@ -851,7 +1003,7 @@ class LeftTower extends Tower{
     shoot() {
         const now = Date.now();
         if (now - this.lastShotTime > this.shootingDelay) {
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 'left', this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5,0,20, this.attackPower,5));
             this.lastShotTime = now;
         }
         setTimeout(()=>{
@@ -869,7 +1021,7 @@ class RightTower extends Tower{
     shoot() {
         const now = Date.now();
         if (now - this.lastShotTime > this.shootingDelay) {
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 'right', this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 0,300, this.attackPower,5));
             this.lastShotTime = now;
         }
         setTimeout(()=>{
@@ -887,8 +1039,8 @@ class DoubleTower extends Tower{
     shoot() {
         const now = Date.now();
         if (now - this.lastShotTime > this.shootingDelay) {
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 'right', this.attackPower,5));
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 'left', this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 200,200, this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 10,10, this.attackPower,5));
             this.lastShotTime = now;
         }
         setTimeout(()=>{
@@ -904,15 +1056,37 @@ class Block extends Defensive {
     }
 }
 
+class FireParticle {
+    constructor(game, x, y) {
+        this.game = game;
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 5 + 2;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = Math.random() * -1 - 1;
+        this.alpha = 1;
+        this.color = `rgba(255, 69, 0, ${this.alpha})`; // Orange fire color
+    }
 
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.alpha -= 0.02;
+        if (this.alpha <= 0) {
+            this.alpha = 0;
+        }
+        this.color = `rgba(255, 69, 0, ${this.alpha})`;
+    }
 
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+    }
 
-
-
-
-
-
-
-
-
-
+    isAlive() {
+        return this.alpha > 0;
+    }
+}

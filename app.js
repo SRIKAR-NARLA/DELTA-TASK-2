@@ -1,5 +1,6 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+let currentTime,lastTime;
 
 canvas.width = window.innerWidth*0.5;
 canvas.height = window.innerHeight*0.5;
