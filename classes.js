@@ -3,16 +3,30 @@ class Game{
         this.ctx = ctx;
         this.width = width;
         this.height = height;
-        this.player = new Player(this,200,200,0,1,0,1,40,40,100);
+        this.player = new Player(this,200,200,0,0.5,0,1,40,40,100);
         this.score=0;
         this.cash=200;
         this.zombies = [];
         this.utilities = [];
         this.powerups=null;
-        this.paused=false;
+        this.paused=true;
         this.gameOver=false;
-        this.startSpawning();
-        this.spawnPowerup();
+        this.timer=10;
+        this.preparationTimer();
+    }
+
+    preparationTimer() {
+        let countdown = this.timer;
+        const interval = setInterval(() => {
+            countdown--;
+            this.timer=countdown;
+            if (countdown <= 0) {
+                clearInterval(interval);
+                this.paused = false; 
+                this.startSpawning();
+                this.spawnPowerup();
+            }
+        }, 1000);
     }
 
     reset() {
@@ -22,60 +36,58 @@ class Game{
         this.zombies = [];
         this.powerups = null;
         this.utilities = [];
-        this.paused = false;
+        this.paused = true;
         this.gameOver = false;
-        this.leaderBoard = this.loadLeaderBoard();
-        this.startSpawning();
-        this.spawnPowerup();
-    }
-
-    restartGame() {
-        if (this.gameOver) {
-            this.reset();
-            this.paused = false;
-            this.gameOver = false;
-        }
+        this.timer=10;
+        this.preparationTimer();
     }
 
     spawnPowerup(){
-        if(this.gameOver===false || this.paused===false){
-            const powerupTypes = [
-                { image: 'ns', effect: 'drain', duration: 5000 },
-                { image: 'ns', effect: 'heal', duration: 7000 },
-                { image: 'ns', effect: 'freeze', duration: 10000 }
-            ];
-            const randomPowerup = powerupTypes[Math.floor(Math.random() * powerupTypes.length)];
-            this.powerups=new Powerup(this, randomPowerup.name, randomPowerup.effect, randomPowerup.duration);
-            setTimeout(() => this.spawnPowerup(), 15000);
+        if (this.gameOver===false && this.paused===false) {
+            if(this.timer===0){
+                const powerupTypes = [
+                    { image: '/images/drain.png', effect: 'drain', duration: 5000 },
+                    { image: '/images/health.jpg', effect: 'heal', duration: 7000 },
+                    { image: '/images/freeze.png', effect: 'freeze', duration: 10000 },
+                    {image: '/images/ammo.png', effect: 'ammo', duration: 4000 }
+                ];
+                const randomPowerup = powerupTypes[Math.floor(Math.random() * powerupTypes.length)];
+                this.powerups=new Powerup(this, randomPowerup.image, randomPowerup.effect, randomPowerup.duration);
+                setTimeout(() => this.spawnPowerup(), 15000);
+            }
         }
     }
 
     startSpawning() {
-        this.spawnZombie1();
-        this.spawnZombie2();
-        this.spawnZombie3();
+            this.spawnNormalZombie();
+            this.spawnFlyingZombie();
+            this.spawnFireZombie();
     }
 
-    spawnZombie1() {
-        if (!this.gameOver) {
-            this.zombies.push(new Zombie1(this));
-            setTimeout(() => this.spawnZombie1(), 5000);
+    spawnNormalZombie() {
+        if (this.gameOver===false && this.paused===false) {
+            if(this.timer===0){
+                this.zombies.push(new NormalZombie(this));
+                setTimeout(() => this.spawnNormalZombie(), 5000);
+            }
         }
     }
 
-    spawnZombie2() {
-        if (!this.gameOver) {
-            if(this.score>5)
-                this.zombies.push(new Zombie2(this));
-            setTimeout(() => this.spawnZombie2(), 15000);
+    spawnFireZombie() {
+        if (this.gameOver===false && this.paused===false) {
+            if(this.timer===0 && this.score>=20){
+                this.zombies.push(new fireZombie(this));
+                setTimeout(() => this.spawnFireZombie(), 15000);
+            }
         }
     }
 
-    spawnZombie3() {
-        if (!this.gameOver) {
-            if(this.score>25)
-                this.zombies.push(new Zombie3(this));
-            setTimeout(() => this.spawnZombie3(), 25000);
+    spawnFlyingZombie() {
+        if (this.gameOver===false && this.paused===false) {
+            if(this.timer===0 && this.score>=30){
+                this.zombies.push(new FlyingZombie(this));
+                setTimeout(() => this.spawnFlyingZombie(), 25000);
+            }
         }
     }
 
@@ -98,15 +110,18 @@ class Game{
         if(this.player.health<=0)this.player.health=0;
                     if(this.player.health===0){
                         this.gameOver=true;
+                        clearTimeout(interval);
+                        gameOver();
                         this.saveScore(this.score);
-                        this.leaderBoard = this.loadLeaderBoard();
         }
     }
 
     draw() {
         this.player.draw(this.ctx);
         this.zombies.forEach(zombie => zombie.draw(this.ctx));
-        this.player.shotArray.forEach(shot => shot.draw(this.ctx));
+        if(!this.gameOver){
+            this.player.shotArray.forEach(shot => shot.draw(this.ctx));
+        }
         this.powerups && this.powerups.draw(this.ctx);
         this.utilities && this.utilities.forEach(utility=>utility.draw(this.ctx));
         this.ctx.fillStyle = 'red';
@@ -121,16 +136,12 @@ class Game{
             this.ctx.font = '40px Arial';
             this.ctx.fillText('Paused', this.width / 2 - 60, this.height / 2);
         }
-        
-        if (this.gameOver) {
-           this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-           this.ctx.fillRect(0, 0, this.width, this.height);
-           this.ctx.fillStyle = 'white';
-           this.ctx.font = '40px Arial';
-           this.ctx.fillText('Game Over', this.width / 2 - 100, this.height / 2);
-           this.ctx.font = '20px Arial';
-           this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2 - 60, this.height / 2 + 40);
-           this.displayLeaderBoard();
+
+        if(this.timer>0){
+            this.ctx.fillStyle = 'white';
+            if(this.timer<=5)this.ctx.fillStyle = 'red';
+            this.ctx.font = '40px Arial';
+            this.ctx.fillText(`${this.timer}`, this.width / 2 - 60, this.height / 2);
         }
     }
 
@@ -138,7 +149,7 @@ class Game{
         let leaderBoard = this.loadLeaderBoard();
         leaderBoard.push(score);
         leaderBoard.sort((a, b) => b - a); 
-        if (leaderBoard.length > 3) {
+        if (leaderBoard.length > 10) {
             leaderBoard.pop(); 
         }
         localStorage.setItem('leaderBoard', JSON.stringify(leaderBoard));
@@ -147,15 +158,6 @@ class Game{
     loadLeaderBoard() {
         let leaderBoard = localStorage.getItem('leaderBoard');
         return leaderBoard ? JSON.parse(leaderBoard) : [];
-    }
-
-    displayLeaderBoard() {
-        this.ctx.fillStyle = 'white';
-        this.ctx.font = '20px Arial';
-        this.ctx.fillText('Leaderboard:', this.width / 2 - 60, this.height / 2 + 80);
-        this.leaderBoard.forEach((score, index) => {
-            this.ctx.fillText(`${index + 1}. ${score}`, this.width / 2 - 60, this.height / 2 + 100 + index * 20);
-        });
     }
 
     clamp(value, min, max) {
@@ -182,6 +184,21 @@ class Game{
         );
     }
 
+    isHorizontalColliding(rect1, rect2) {
+        // Check if rect1 is to the left of rect2
+        if (rect1.x + rect1.width > rect2.x && rect1.x < rect2.x + rect2.width) {
+            return true;
+        }
+        return false;
+    }
+
+    isVerticalColliding(rect1,rect2){
+        if (rect1.y + rect1.height > rect2.y && rect1.y < rect2.y + rect2.height) {
+            return true;
+        }
+        return false;
+    }
+
     checkCollisions() {
         //Shot and Zombie
         this.player.shotArray.forEach(projectile => {
@@ -200,13 +217,11 @@ class Game{
                 if(zombie.justHit===false){
                     zombie.justHit=true;
                     this.player.health-=25;
-                    if(zombie instanceof Zombie3){
-                        for(let i=0;i<5;i++){
-                            setTimeout(()=>{
-                                this.player.health-=5;
+                    if(zombie instanceof fireZombie){
+                            interval = setTimeout(()=>{
+                                this.player.health-=10;
                                 if(this.player.health<=0)this.player.health=0;
                             },5000);
-                        }
                     }
                     setTimeout(()=>{
                         zombie.justHit=false;
@@ -265,12 +280,22 @@ class Game{
                     }else if(utility.name==='block'){
                         if(zombie.y+zombie.height===utility.y+utility.height){
                             zombie.isBlocked=true;
-                            utility.health-=50;
+                            if(zombie.hitUtility===false)
+                                utility.health-=50;
+                            zombie.hitUtility=true;
+                            setTimeout(()=>{
+                                zombie.hitUtility=false;
+                            },5000);
                             if(utility.health===0)this.utilities = this.utilities.filter(p => p !== utility);   
                         }
                     }else if(utility.name==='tower'){
                         zombie.isBlocked=true;
-                        utility.health-=25;
+                            if(zombie.hitUtility===false)
+                                utility.health-=50;
+                            zombie.hitUtility=true;
+                            setTimeout(()=>{
+                                zombie.hitUtility=false;
+                            },5000);
                         if(utility.health===0){
                             utility.isdestroyed=true;
                             this.utilities = this.utilities.filter(p => p !== utility);
@@ -309,12 +334,26 @@ class Player{
         this.wfacingDirection = 'right';
         this.maxFuel = 200; 
         this.currentFuel = this.maxFuel; 
-        this.fuelConsumptionRate = 1; 
-        this.fuelRegenerationRate = 0.25;
+        this.fuelConsumptionRate = 0.5; 
+        this.fuelRegenerationRate = 0.05;
         this.fireParticles=[]; 
         this.control();
         this.mouseX = null;
         this.mouseY = null;
+
+        this.gunLength = 30; // Length of the gun
+        this.gunWidth = 20; // Width of the gun
+        this.gunAngle = 0; // Initial angle of the gun
+        this.gunOffsetX = this.width / 2; // X offset from player's center
+        this.gunOffsetY = -5; // Y offset from player's position
+
+
+        // Mouse position
+        this.mouseX = 0;
+        this.mouseY = 0;
+
+        // Bind mouse move event listener
+        document.addEventListener('mousemove', (event) => this.updateMousePosition(event));
     }
 
     control(){
@@ -343,17 +382,17 @@ class Player{
                     this.x=800;
                     this.vx = 0;
                     this.game.zombies.forEach(zombie=>{
-                        zombie.dx=-5;
+                        zombie.dx=-2;
                     })
                     this.game.utilities.forEach(utility=>{
-                        utility.dx=-5;
+                        utility.dx=-2;
                     })
                     this.shotArray.forEach(shot=>{
-                        shot.dx=-5;
+                        shot.dx=-2;
                     })
                     if(this.game.powerups)this.game.powerups.dx=-5;
                 }
-                else this.vx = 5;
+                else this.vx = 2;
                 this.facingDirection = 'right';
                 this.wfacingDirection = 'right';
             }
@@ -362,17 +401,17 @@ class Player{
                     this.x=200;
                     this.vx = 0;
                     this.game.zombies.forEach(zombie=>{
-                        zombie.dx=5;
+                        zombie.dx=2;
                     })
                     this.game.utilities.forEach(utility=>{
-                        utility.dx=5;
+                        utility.dx=2;
                     })
                     this.shotArray.forEach(shot=>{
-                        shot.dx=5;
+                        shot.dx=2;
                     })
                     if(this.game.powerups)this.game.powerups.dx=5;
                 }
-                else this.vx = -5;
+                else this.vx = -2;
                 this.facingDirection = 'left';
                 this.wfacingDirection = 'left';
             }
@@ -390,7 +429,7 @@ class Player{
                     this.isBlocked=null;
                     this.isJumping = true;
                     this.isFlying = true;
-                    this.vy = -factor;
+                    this.vy = -2;
                     this.ay = 0;
                     this.facingDirection = 'up';
                     this.fireParticles=[];
@@ -421,101 +460,173 @@ class Player{
                 else{
                     console.log(this.game.score);
                 }
-            }else if(e.key==='7'){
-                if(this.game.cash>=50 && this.y===this.game.height-this.height){
-                    this.game.utilities.push(new Mine(this.game,this.x,this.y+35))
-                    this.game.cash-=50;
-                }
-            }else if(e.key==='8'){
-                if(this.game.cash>=25 && this.y===this.game.height-this.height){
-                    this.game.utilities.push(new Trap(this.game,this.x,this.y+35))
-                    this.game.cash-=25;
-                }
-            }else if(e.key==='9'){
-                if(this.game.cash>=75 && this.vy===0 && !this.isFlying && !this.isJumping){
-                    this.game.utilities.push(new Block(this.game,this.x,this.y))
-                    this.game.cash-=75;
-                }
-            }else if(e.key==='4'){
-                if(this.game.cash>=200 && this.y===this.game.height-this.height){
-                    this.game.utilities.push(new LeftTower(this.game,this.x,this.y))
-                    this.game.cash-=200;
-                }
+            }else if(e.key==='i'){
+                showDialog('inventoryDialog');
             }
-            else if(e.key==='5'){
-                if(this.game.cash>=300 && this.y===this.game.height-this.height){
-                    this.game.utilities.push(new DoubleTower(this.game,this.x,this.y))
-                    this.game.cash-=300;
-                }
-            }
-            else if(e.key==='6'){
-                if(this.game.cash>=200 && this.y===this.game.height-this.height){
-                    this.game.utilities.push(new RightTower(this.game,this.x,this.y))
-                    this.game.cash-=200;
-                }
-            }else if(e.key==='f')this.game.paused=!this.game.paused;
+            else if(e.key==='f')this.game.paused=!this.game.paused;
+            else if(e.key==='r')this.weapon.reload();
         });
 
         window.addEventListener('click', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            this.mouseX = e.clientX - rect.left;
-            this.mouseY = e.clientY - rect.top;
-            if(!this.paused && !this.gameOver)
-            {if(this.weapon===this.weapon3){
-                this.weapon.shoot(this.x + this.width / 2, this.y, this.mouseX, this.mouseY);
-            }else if(this.weapon===this.weapon1){
-                this.weapon.shoot(this.x + this.width / 2, this.y, this.mouseX, this.mouseY);
-                if(this.facingDirection==='right'){
-                    this.x-=1;
-                    this.y-=1;
-                }else if(this.facingDirection==='left'){
-                    this.x+=1;
-                    this.y-=1;
-                }
-            }else if(this.weapon===this.weapon2){
-                this.weapon.shoot(this.x, this.y);
-            }}
+            if(!this.game.gameOver && !this.game.paused && this.game.timer===0){
+                const rect = canvas.getBoundingClientRect();
+                this.mouseX = e.clientX - rect.left;
+                this.mouseY = e.clientY - rect.top;
+                if(!this.paused && !this.gameOver)
+                {if(this.weapon===this.weapon3){
+                    console.log('hi')
+                    if(this.weapon.currentAmmo>0)
+                    this.weapon.shoot(this.x + 20, this.y + 20, this.mouseX, this.mouseY);
+                }else if(this.weapon===this.weapon1){
+                    if(this.weapon.currentAmmo>0)
+                        this.weapon.shoot(this.x+20, this.y + 20, this.mouseX, this.mouseY);
+                    if(this.facingDirection==='right'){
+                        this.x-=1;
+                        this.y-=1;
+                    }else if(this.facingDirection==='left'){
+                        this.x+=1;
+                        this.y-=1;
+                    }
+                }else if(this.weapon===this.weapon2){
+                    if(this.weapon.currentAmmo>0)
+                    this.weapon.shoot(this.x+20, this.y+20,this.mouseX,this.mouseY);
+                    if(this.facingDirection==='right'){
+                        this.x-=1;
+                        this.y-=1;
+                    }else if(this.facingDirection==='left'){
+                        this.x+=1;
+                        this.y-=1;
+                    }
+                }}
+            }
         });
     }
 
     draw(c) {
-        // if (this.mouseX !== null && this.mouseY !== null) {
-        //     c.beginPath();
-        //     c.moveTo(this.x + this.width / 2, this.y);
-        //     c.lineTo(this.mouseX, this.mouseY);
-        //     c.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-        //     c.lineWidth = 2;
-        //     c.stroke();
-        //     c.closePath();
-        // }
-
-        this.fireParticles.forEach(particle => particle.draw(ctx));
+        // Draw fire particles
+        this.fireParticles.forEach(particle => particle.draw(c));
+    
+        // Draw player rectangle
         c.fillStyle = 'blue';
         c.fillRect(this.x, this.y, this.width, this.height);
+    
+        // Calculate angle and position of the gun relative to the player
+        let angle = Math.atan2(this.mouseY - (this.y + this.height / 2), this.mouseX - (this.x + this.width / 2));
+        this.gunAngle = angle; // Update gun angle
+    
+        // Calculate gun end position
+        let gunEndX = this.x + this.width / 2 + Math.cos(this.gunAngle) * this.gunLength;
+        let gunEndY = this.y + this.height / 2 + Math.sin(this.gunAngle) * this.gunLength;
+    
+        // Draw the gun
+        c.beginPath();
+        c.moveTo(this.x + this.width / 2, this.y + this.height / 2);
+        c.lineTo(gunEndX, gunEndY);
+        c.lineWidth = this.gunWidth;
+        c.strokeStyle = 'gray'; // Example color
+        c.lineCap = 'round'; // Ensure round line cap for gun end
+        c.stroke();
+        c.lineWidth=1
+        
 
-        c.fillStyle = 'green';
-        const HealthBarWidth = (this.health / 100) * this.width;
-        c.fillRect(this.x, this.y - 10, HealthBarWidth, 5);
+        // Draw Health bar
+    c.fillStyle = 'green';
+    c.lineCap = 'round';
+    const healthBarWidth = (this.health / 100) * 125;
+    c.fillRect(10,10, healthBarWidth, 15);
 
-        c.strokeStyle = 'black';
-        c.strokeRect(this.x, this.y - 10, this.width, 5);
+    c.strokeStyle = 'black';
+    c.lineCap = 'round';
+    c.strokeRect(10,10, 125, 15);
 
-        c.fillStyle = 'green';
-        const fuelBarWidth = (this.currentFuel / this.maxFuel) * 100; 
-        c.fillRect(10, 10, fuelBarWidth, 10);
+    // Draw Ammo bar
+    c.fillStyle = 'green';
+    c.lineCap = 'round';
+    if (this.weapon.currentAmmo <= this.weapon.maxLoaded / 2) c.fillStyle = 'yellow';
+    if (this.weapon.currentAmmo <= 1) c.fillStyle = 'red';
+    const ammoBarWidth = (this.weapon.currentAmmo / this.weapon.maxLoaded) * 100;
+    c.fillRect(10, 40, ammoBarWidth, 10);
 
-        c.strokeStyle = 'black';
-        c.strokeRect(10, 10, 100, 10);
+    c.strokeStyle = 'black';
+    c.lineCap = 'round';
+    c.strokeRect(10, 40, 100, 10);
+
+    c.fillStyle = 'black';
+    c.font = '14px Arial';
+    if (this.weapon.isReloading) {
+        c.fillText(`${this.weapon.name} - Reloading`, 120, 45);
+    } else {
+        c.fillText(`${this.weapon.name} - Ammo: ${this.weapon.currentAmmo}/${this.weapon.maxLoaded}/${this.weapon.ammoCapacity}`, 120, 45);
     }
 
+    // Draw Fuel bar (vertical)
+    c.fillStyle = 'green';
+    c.lineCap = 'round';
+    const fuelBarHeight = (this.currentFuel / this.maxFuel) * 100;
+    c.fillRect(10, 60, 10, fuelBarHeight);
+
+    c.strokeStyle = 'black';
+    c.lineCap = 'round';
+    c.strokeRect(10, 60, 10, 100);
+
+    // Draw Fuel bar label
+    c.fillStyle = 'black';
+    c.font = '12px Arial';
+    c.fillText('Fuel', 25, 70);
+
+
+        const circles = [];
+        const totalCircles=80;
+        const speed=20;
+        let x = this.x+20;
+        let y = this.y+20;
+
+
+        if(this.weapon!==this.weapon3){
+            let speedX=speed*Math.cos(angle);
+            let speedY=speed*Math.sin(angle);
+            for (let i = 0; i < totalCircles; i++) {
+                x += speedX;
+                y += speedY;
+                speedY += 0.5;
+          
+                circles.push({ x, y });
+              }
+        }else{
+            let speedX=speed*Math.cos(angle);
+            let speedY=speed*Math.sin(angle);
+            for (let i = 0; i < totalCircles; i++) {
+                x += speedX;
+                y += speedY;
+          
+                circles.push({ x, y });
+              }
+        }
+
+        circles.forEach(circle=>{
+            c.beginPath();
+            c.arc(circle.x, circle.y, 2, 0, Math.PI * 2);
+            c.fill();
+        })
+      
+
+    }
+    
     createFireParticles() {
         for (let i = 0; i < 20; i++) {
             this.fireParticles.push(new FireParticle(this.game, this.x + this.width / 2, this.y + this.height));
         }
     }
 
+    updateMousePosition(event) {
+        // Update mouse coordinates
+        let rect = this.game.ctx.canvas.getBoundingClientRect();
+        this.mouseX = event.clientX - rect.left;
+        this.mouseY = event.clientY - rect.top;
+    }
+
     update() {
-        if(this.x>800 ){
+        if(this.x>800){
             this.vx=0;
             this.x=800;
         }else if(this.x<200){
@@ -592,6 +703,7 @@ class Zombie {
         this.direction = 'right';
         this.dx = 0;
         this.dy = 0;
+        this.hitUtility=false;
 
     }
 
@@ -610,14 +722,12 @@ class Zombie {
     }
 
     update() {
+        console.log(this.isBlocked)
         this.x += this.dx;
         this.y += this.dy;
-        if (this.isBlocked) {
-            if (this.direction === 'right') this.x -= 100;
-            else this.x += 100;
-            this.isBlocked = !this.isBlocked;
+        if (!this.game.utilities.some(utility => this.game.isCollidingRR(utility, this))) {
+            this.isBlocked = false;
         }
-
         if (this.health > 0) {
             this.y += this.vy;
 
@@ -627,9 +737,11 @@ class Zombie {
                 if (!this.froze) {
                     if (this.x + this.width <= this.game.player.x) {
                         this.direction = 'right';
-                        this.x += this.vx;
+                        if(!this.isBlocked)
+                            this.x += this.vx;
                     } else if (this.x >= this.game.player.x + this.game.player.width) {
-                        this.x -= this.vx;
+                        if(!this.isBlocked)
+                            this.x -= this.vx;
                         this.direction = 'left';
                     }
                 }
@@ -651,11 +763,11 @@ class Zombie {
     }
 }
 
-class Zombie1 extends Zombie {
+class NormalZombie extends Zombie {
     constructor(game) {
         const image = new Image();
         image.src='./zombie1/zombie-1-run.jpg'
-        super(game, 20, 20, 1, 0, 20,image,1,1);
+        super(game, 20, 20, 0.25, 0, 40);
     }
 
     getColor() {
@@ -664,9 +776,48 @@ class Zombie1 extends Zombie {
 }
 
 
-class Zombie2 extends Zombie {
+class FlyingZombie extends Zombie {
     constructor(game) {
-        super(game, 20, 40, 3, 0, 40);
+        super(game, 20, 40, 1, 0, 80);
+        this.optimal=this.game.height - 5 * this.height;
+        this.y = this.game.height - 5 * this.height;
+        this.targetY = this.game.player.y;
+        this.flyingSpeed = 0.05;  // Speed of vertical interpolation
+    }
+
+    update() {
+        this.x += this.dx;
+        this.y += this.dy;
+
+        if (!this.game.utilities.some(utility => this.game.checkCollisions(utility, this))) {
+            this.isBlocked = false;
+        }
+
+        if (this.health > 0) {
+            // Update targetY to follow the player's Y position
+            this.targetY = this.game.player.y;
+
+            // Horizontal movement towards the player
+            if (this.x + this.width <= this.game.player.x) {
+                this.direction = 'right';
+                this.y += (this.optimal - this.y) * this.flyingSpeed;
+                if (!this.isBlocked) this.x += this.vx;
+            } else if (this.x >= this.game.player.x + this.game.player.width) {
+                this.direction = 'left';
+                this.y += (this.optimal - this.y) * this.flyingSpeed;
+                if (!this.isBlocked) this.x -= this.vx;
+            }else{
+                this.y += (this.targetY - this.y) * this.flyingSpeed;
+            }
+
+            // Smooth vertical movement towards the player's Y level
+
+        } else {
+            // Remove the zombie if health is zero
+            this.game.zombies = this.game.zombies.filter(z => z !== this);
+            this.game.score += 1;
+            this.game.cash += 20;
+        }
     }
 
     getColor() {
@@ -674,13 +825,12 @@ class Zombie2 extends Zombie {
     }
 }
 
-class Zombie3 extends Zombie{
-    constructor(game) {
-        super(game, 30, 30, 2, 0, 30);
-    }
 
-    getColor() {
-        return 'blue';
+
+class fireZombie extends Zombie{
+    constructor(game) {
+        super(game, 30, 30, 0.5, 0, 60);
+        this.ay=0.5;
     }
 }
 
@@ -704,7 +854,7 @@ class Projectile extends Attack {
         this.vx = 0;
         this.vy = 0;
         this.ax = 0;
-        this.ay = 0.1; 
+        this.ay = 0.5; 
         this.type = 'type1';
         this.dx=0;
         this.dy=0;
@@ -784,6 +934,7 @@ class Weapons{
         this.player=player;
         this.width=this.player.width;
         this.height=this.player.height;
+        this.isReloading = false;
     }
 }
 
@@ -792,13 +943,41 @@ class Weapon1 extends Weapons{
         super(player);
         this.name = "Weapon1";
         this.damage = 20;
-        this.speed = 5;
+        this.speed = 20;
+        this.maxAmmo=30;
+        this.maxLoaded=10;
+        this.ammoCapacity = 30; 
+        this.currentAmmo = 10; 
+        this.reloadTime = 2000; 
     }
 
     shoot(x, y, x2,y2) {
         if (Date.now() - this.player.prevShotTime > 1000){
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed,x2,y2,this.damage,10));
-        this.player.prevShotTime= Date.now();
+            if(this.currentAmmo > 0 && !this.isReloading){
+                this.currentAmmo--;
+                this.player.shotArray.push(new Projectile(this.player.game,x,y,this.speed,x2,y2,this.damage,5));
+                this.player.prevShotTime= Date.now();
+            }
+        }
+    }
+
+    reload() {
+        if (!this.isReloading) {
+            this.isReloading = true;
+            console.log('Reloading...');
+
+            setTimeout(() => {
+                let bulletsRreuired = this.maxLoaded-this.currentAmmo;
+                if(this.ammoCapacity>=bulletsRreuired){
+                    this.ammoCapacity-=bulletsRreuired;
+                    this.currentAmmo=this.maxLoaded;
+                }else if(this.ammoCapacity<bulletsRreuired && this.ammoCapacity>0){
+                    this.ammoCapacity=0;
+                    this.currentAmmo+=this.ammoCapacity;
+                }
+
+                this.isReloading = false;
+            }, this.reloadTime);
         }
     }
 }
@@ -808,19 +987,45 @@ class Weapon2 extends Weapons{
         super(player);
         this.name = "Weapon2";
         this.damage = 10;
-        this.speed1 = 4;
-        this.speed2 = 5;
-        this.speed3 = 6;
+        this.speed1 = 18;
+        this.speed2 = 20;
+        this.speed3 = 22;
+        this.maxAmmo=20;
+        this.maxLoaded=5;
+        this.ammoCapacity = 20; 
+        this.currentAmmo = 5; 
+        this.reloadTime = 4000; 
     }
 
-    shoot(x,y){
+    shoot(x,y,x2,y2){
         if (Date.now() - this.player.prevShotTime > 1500){
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,10,10,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,30,30,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,60,60,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed1,300,300,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed2,330,330,this.damage,5));
-        this.player.shotArray.push(new Projectile(this.player.game,x+this.player.width/2,y,this.speed3,430,430,this.damage,5));
+            if(this.currentAmmo > 0 && !this.isReloading){
+                this.currentAmmo--;
+                this.player.shotArray.push(new Projectile(this.player.game,x,y,this.speed1,x2,y2,this.damage,3));
+                this.player.shotArray.push(new Projectile(this.player.game,x,y,this.speed2,x2,y2,this.damage,3));
+                this.player.shotArray.push(new Projectile(this.player.game,x,y,this.speed3,x2,y2,this.damage,3));
+                this.player.prevShotTime= Date.now();
+            }
+        }
+    }
+
+    reload() {
+        if (!this.isReloading) {
+            this.isReloading = true;
+            console.log('Reloading...');
+
+            setTimeout(() => {
+                let bulletsRreuired = this.maxLoaded-this.currentAmmo;
+                if(this.ammoCapacity>=bulletsRreuired){
+                    this.ammoCapacity-=bulletsRreuired;
+                    this.currentAmmo=this.maxLoaded;
+                }else if(this.ammoCapacity<bulletsRreuired && this.ammoCapacity>0){
+                    this.ammoCapacity=0;
+                    this.currentAmmo+=this.ammoCapacity;
+                }
+
+                this.isReloading = false;
+            }, this.reloadTime);
         }
     }
 }
@@ -831,13 +1036,41 @@ class Weapon3 extends Weapons{
         this.name = "Weapon3";
         this.damage = 50;
         this.speed = 10;
+        this.maxAmmo=10;
+        this.maxLoaded=2;
+        this.ammoCapacity = 10; 
+        this.currentAmmo = 2; 
+        this.reloadTime = 10000; 
     }
 
     shoot(x1,y1,x2,y2){
         if (Date.now() - this.player.prevShotTime > 5000){
-        this.player.shotArray.push(new Shot(this.player.game,x1+this.player.width/2,y1,x2,y2,this.speed,this.damage,20));
+            if(this.currentAmmo > 0 && !this.isReloading){
+                this.currentAmmo--;
+                this.player.shotArray.push(new Shot(this.player.game,x1,y1,x2,y2,this.speed,this.damage,10));
+                this.player.prevShotTime= Date.now();
+            }
         }
+    }
 
+    reload() {
+        if (!this.isReloading) {
+            this.isReloading = true;
+            console.log('Reloading...');
+
+            setTimeout(() => {
+                let bulletsRreuired = this.maxLoaded-this.currentAmmo;
+                if(this.ammoCapacity>=bulletsRreuired){
+                    this.ammoCapacity-=bulletsRreuired;
+                    this.currentAmmo=this.maxLoaded;
+                }else if(this.ammoCapacity<bulletsRreuired && this.ammoCapacity>0){
+                    this.ammoCapacity=0;
+                    this.currentAmmo+=this.ammoCapacity;
+                }
+
+                this.isReloading = false;
+            }, this.reloadTime);
+        }
     }
 }
 
@@ -861,8 +1094,10 @@ class Powerup{
     draw(ctx){
         if(this.active){
             ctx.fillStyle='purple';
-            ctx.fillRect(this.x,this.y,this.width,this.height);
-            //ctx.drawImage(this.image,this.x,this.y,this.width,this.height);
+            const image = new Image;
+            image.src=this.image;
+            //ctx.fillRect(this.x,this.y,this.width,this.height);
+            ctx.drawImage(image,this.x,this.y,this.width,this.height);
         }    
     }
 
@@ -884,6 +1119,9 @@ class Powerup{
             this.game.zombies.forEach(zombie=>{
                 zombie.health-=20;
             })
+        }else if(this.type==='ammo'){
+            this.game.player.weapon.currentAmmo=this.game.player.weapon.maxLoaded;
+            this.game.player.weapon.ammoCapacity=this.game.player.weapon.maxAmmo;
         }
     }
 
