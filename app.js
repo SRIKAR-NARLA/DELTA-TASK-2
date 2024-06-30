@@ -120,7 +120,7 @@ function handleInventoryItemClick(itemName) {
         case 'Tower 2':
             console.log('Tower 2 selected');
             if(game.cash>=300 && game.player.y===game.height-game.player.height){
-                game.utilities.push(new DoubleTower(game,game.player.x,game.player.y+35))
+                game.utilities.push(new DoubleTower(game,game.player.x,game.player.y))
                 console.log(game.utilities)
                 game.cash-=300;
             }
@@ -129,7 +129,7 @@ function handleInventoryItemClick(itemName) {
         case 'Tower 3':
             console.log('Tower 3 selected');
             if(game.cash>=200 && game.player.y===game.height-game.player.height){
-                game.utilities.push(new RightTower(game,game.player.x,game.player.y+35))
+                game.utilities.push(new RightTower(game,game.player.x,game.player.y))
                 console.log(game.utilities)
                 game.cash-=200;
             }

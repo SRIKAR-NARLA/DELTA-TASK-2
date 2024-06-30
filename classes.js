@@ -1246,7 +1246,7 @@ class LeftTower extends Tower{
     shoot() {
         const now = Date.now();
         if (now - this.lastShotTime > this.shootingDelay) {
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5,0,20, this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 10,0,0, this.attackPower,5));
             this.lastShotTime = now;
         }
         setTimeout(()=>{
@@ -1264,7 +1264,7 @@ class RightTower extends Tower{
     shoot() {
         const now = Date.now();
         if (now - this.lastShotTime > this.shootingDelay) {
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 0,300, this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 10, this.game.width,0, this.attackPower,5));
             this.lastShotTime = now;
         }
         setTimeout(()=>{
@@ -1282,8 +1282,8 @@ class DoubleTower extends Tower{
     shoot() {
         const now = Date.now();
         if (now - this.lastShotTime > this.shootingDelay) {
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 200,200, this.attackPower,5));
-            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 10,10, this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, 0,0, this.attackPower,5));
+            this.game.player.shotArray.push(new Projectile(this.game, this.x + this.width / 2, this.y, 5, this.game.width,0, this.attackPower,5));
             this.lastShotTime = now;
         }
         setTimeout(()=>{
