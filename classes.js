@@ -45,6 +45,7 @@ class Game{
     spawnPowerup(){
         if (this.gameOver===false && this.paused===false) {
             if(this.timer===0){
+                console.log('spawn p')
                 const powerupTypes = [
                     { image: '/images/drain.png', effect: 'drain', duration: 5000 },
                     { image: '/images/health.jpg', effect: 'heal', duration: 7000 },
@@ -142,6 +143,12 @@ class Game{
             if(this.timer<=5)this.ctx.fillStyle = 'red';
             this.ctx.font = '40px Arial';
             this.ctx.fillText(`${this.timer}`, this.width / 2 - 60, this.height / 2);
+        }
+
+        if(this.powerups){
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = '20px Arial';
+            this.ctx.fillText(`${this.powerups.type}`, 300,100);
         }
     }
 
@@ -1094,10 +1101,10 @@ class Powerup{
     draw(ctx){
         if(this.active){
             ctx.fillStyle='purple';
-            const image = new Image;
-            image.src=this.image;
-            //ctx.fillRect(this.x,this.y,this.width,this.height);
-            ctx.drawImage(image,this.x,this.y,this.width,this.height);
+            // const image = new Image;
+            // image.src=this.image;
+            ctx.fillRect(this.x,this.y,this.width,this.height);
+            //ctx.drawImage(image,this.x,this.y,this.width,this.height);
         }    
     }
 
