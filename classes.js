@@ -1240,7 +1240,7 @@ class Tower extends Defensive {
 
 class LeftTower extends Tower{
     constructor(game,x,y){
-        super(game,x,y,40,40,100,30,1000); 
+        super(game,x,y,40,40,100,30,5000); 
     }
 
     shoot() {
@@ -1258,7 +1258,7 @@ class LeftTower extends Tower{
 
 class RightTower extends Tower{
     constructor(game,x,y){
-        super(game,x,y,40,40,100,30,1000); 
+        super(game,x,y,40,40,100,30,5000); 
     }
 
     shoot() {
@@ -1276,7 +1276,7 @@ class RightTower extends Tower{
 
 class DoubleTower extends Tower{
     constructor(game,x,y){
-        super(game,x,y,40,40,100,40,2000); 
+        super(game,x,y,40,40,100,40,10000); 
     }
 
     shoot() {
